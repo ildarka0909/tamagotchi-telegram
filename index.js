@@ -1,4 +1,5 @@
 require('dotenv').config();
+const http = require('http');
 const { Telegraf, Markup } = require('telegraf');
 const { Tamagotchi, PET_TYPES } = require('./game');
 
@@ -132,6 +133,15 @@ setInterval(() => {
     pet.tick();
   }
 }, 60000);
+
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Bot is running');
+});
+
+server.listen(process.env.PORT || 3000, () => {
+  console.log(`HTTP server listening on port ${process.env.PORT || 3000}`);
+});
 
 bot.launch().then(() => {
   console.log('Бот запущен!');
