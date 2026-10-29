@@ -1,9 +1,2 @@
-services:
-  - type: web
-    name: tamagotchi-telegram
-    env: node
-    buildCommand: npm install
-    startCommand: node index.js
-    envVars:
-      - key: BOT_TOKEN
-        sync: false
+startCommand: node index.js
+buildCommand: npm install

@@ -106,7 +106,7 @@ class Tamagotchi {
       this.hunger = Math.min(100, this.hunger + deltaMinutes * 0.3);
     }
 
-    this.weight = Math.max(1, this.weight + (this.hunger > 70 ? deltaMinutes * 0.05 : 0));
+    this.weight = Math.max(1, this.weight - deltaMinutes * 0.01);
     if (this.weight > 20 && this.happiness < 30) {
       this.happiness = Math.max(0, this.happiness - deltaMinutes * 0.2);
     }
@@ -424,7 +424,7 @@ class Tamagotchi {
       return { success: false, message: msg };
     } else {
       const hint = num < this.gameState.target ? 'больше' : 'меньше';
-      return { success: null, message: `❌ Нет. Загаданное число ${hint}. Попытка ${this.gameState.attempts}/3. Введи число:` };
+      return { success: false, message: `❌ Нет. Загаданное число ${hint}. Попытка ${this.gameState.attempts}/3. Введи число:` };
     }
   }
 
@@ -469,16 +469,22 @@ class Tamagotchi {
       a, b,
       answer: a + b
     };
-    return `🧮 ${this.name} проверяет твою matematiку: Сколько будет ${a} + ${b}?`;
+    return `🧮 ${this.name} проверяет твою математику: Сколько будет ${a} + ${b}?`;
   }
 
   processMath(ans) {
     if (!this.gameState || this.gameState.type !== 'math') return null;
 
-    if (parseInt(ans) === this.gameState.answer) {
+    const num = parseInt(ans);
+    if (!isNaN(num) && num === this.gameState.answer) {
       const msg = `✅ Правильно! ${this.name} гордится тобой!`;
       this.happiness = Math.min(100, this.happiness + 15);
       this.discipline = Math.min(100, this.discipline + 5);
+    } else if (isNaN(num)) {
+      const msg = `❌ Введи число!`;
+      this.gameState = null;
+      this.tick();
+      return { success: false, message: msg };
     } else {
       const msg = `❌ Неправильно. Ответ был ${this.gameState.answer}.`;
       this.happiness = Math.max(0, this.happiness - 5);

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Тамагочи Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <div id="petName">Питомец</div>
+      <div id="petStage">Яйцо</div>
+    </div>
+
+    <canvas id="gameCanvas" width="390" height="500"></canvas>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">🍗 Голод</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillHunger"></div></div>
+        <div class="stat-value" id="valHunger">0%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">😊 Радость</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillHappiness"></div></div>
+        <div class="stat-value" id="valHappiness">0%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">🔋 Энергия</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillEnergy"></div></div>
+        <div class="stat-value" id="valEnergy">0%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">🧼 Чистота</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillCleanliness"></div></div>
+        <div class="stat-value" id="valCleanliness">0%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">🛡 Discipline</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillDiscipline"></div></div>
+        <div class="stat-value" id="valDiscipline">0%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">❤️ Здоровье</div>
+        <div class="stat-bar"><div class="stat-fill" id="fillHealth"></div></div>
+        <div class="stat-value" id="valHealth">0%</div>
+      </div>
+    </div>
+
+    <div id="messages" class="messages"></div>
+
+    <div class="actions">
+      <button class="action-btn" onclick="doAction('feed')">🍗 Кормить</button>
+      <button class="action-btn" onclick="doAction('snack')">🍬 Лакомство</button>
+      <button class="action-btn" onclick="doAction('play')">🎮 Играть</button>
+      <button class="action-btn" onclick="toggleSleep()">${t('sleep')}</button>
+      <button class="action-btn" onclick="doAction('clean')">🛁 Убрать</button>
+      <button class="action-btn" onclick="doAction('medicine')">💊 Лечить</button>
+      <button class="action-btn" onclick="doAction('praise')">👏 Похвалить</button>
+      <button class="action-btn" onclick="doAction('scold')">👋 Ругать</button>
+    </div>
+
+    <div class="games" style="display:none" id="gamesPanel">
+      <h3>Мини-игры</h3>
+      <button class="game-btn" onclick="startGuess()">🔢 Угадай число</button>
+      <button class="game-btn" onclick="startMath()">🧮 Примеры</button>
+      <button class="game-btn" onclick="closeGames()">Закрыть</button>
+    </div>
+
+    <div id="overlay" class="overlay" style="display:none">
+      <div class="overlay-content">
+        <h2 id="overlayTitle"></h2>
+        <p id="overlayText"></p>
+        <div id="overlayButtons"></div>
+      </div>
+    </div>
+
+    <div id="inputPanel" style="display:none">
+      <input type="number" id="gameInput" placeholder="Введите число">
+      <button onclick="submitGameInput()">Отправить</button>
+      <button onclick="closeInput()">Отмена</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

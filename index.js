@@ -1,6 +1,9 @@
 require('dotenv').config();
-const http = require('http');
-const { Telegraf, Markup } = require('telegraf');
+const path = require('path');
+const fs = require('fs');
+const cors = require('cors');
+const express = require('express');
+const { Telegraf } = require('telegraf');
 const { Tamagotchi, PET_TYPES, GROWTH_STAGES } = require('./game');
 
 const TOKEN = process.env.BOT_TOKEN;
@@ -9,9 +12,44 @@ if (!TOKEN) {
   process.exit(1);
 }
 
+const WEB_APP_URL = process.env.WEB_APP_URL || 'https://tamagotchi-telegram.onrender.com';
 const bot = new Telegraf(TOKEN);
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+const PETS_FILE = path.join(__dirname, 'data', 'pets.json');
 const pets = new Map();
-const userStates = new Map();
+
+function loadPets() {
+  try {
+    if (fs.existsSync(PETS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(PETS_FILE, 'utf8'));
+      for (const [userId, petData] of Object.entries(data)) {
+        pets.set(userId, Tamagotchi.fromJSON(petData));
+      }
+      console.log(`Загружено питомцев: ${pets.size}`);
+    }
+  } catch (e) {
+    console.error('Ошибка загрузки питомцев:', e);
+  }
+}
+
+function savePets() {
+  try {
+    fs.mkdirSync(path.dirname(PETS_FILE), { recursive: true });
+    const data = {};
+    for (const [userId, pet] of pets.entries()) {
+      data[userId] = pet.toJSON();
+    }
+    fs.writeFileSync(PETS_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('Ошибка сохранения питомцев:', e);
+  }
+}
 
 function getPet(userId) {
   if (!pets.has(userId)) {
@@ -20,246 +58,199 @@ function getPet(userId) {
   return pets.get(userId);
 }
 
-function setState(userId, state, data = {}) {
-  userStates.set(userId, { state, ...data });
-}
-
-function getState(userId) {
-  return userStates.get(userId);
-}
-
-function clearState(userId) {
-  userStates.delete(userId);
-}
-
-bot.start(async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  if (pet.name) {
-    pet.tick();
-    return ctx.reply(`${pet.getStatusText()}\n\nЧто хочешь сделать?`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  }
-
-  const buttons = Object.entries(PET_TYPES).map(([key, info]) => [
-    Markup.button.callback(`${info.emoji} ${info.name}`, `choose_pet_${key}`)
-  ]);
-  ctx.reply('Добро пожаловать в Тамагочи! 🐾\n\nВыбери своего питомца:', Markup.inlineKeyboard(buttons));
-});
-
-bot.action(/choose_pet_(.+)/, async (ctx) => {
-  const type = ctx.match[1];
-  const pet = getPet(ctx.from.id);
-  pet.petType = type;
-  pet.typeInfo = PET_TYPES[type] || PET_TYPES.DOG;
-
-  ctx.editMessageText(`Отлично! Теперь придумай имя для своего ${pet.typeInfo.emoji} ${pet.typeInfo.name}:`);
-  setState(ctx.from.id, 'waiting_name');
-  ctx.answerCbQuery();
-});
-
-bot.on('text', async (ctx) => {
-  const text = ctx.message.text.trim();
-  const state = getState(ctx.from.id);
-  const pet = getPet(ctx.from.id);
-
-  if (state && state.state === 'waiting_name') {
-    pet.name = text;
-    pet.stage = GROWTH_STAGES.EGG;
-    pet.tick();
-    clearState(ctx.from.id);
-    return ctx.reply(
-      `Питомец ${pet.getEmoji()} ${pet.name} создан!\n\n${pet.getStatusText()}\n\nОн только что вылупился из яйца. Заботься о нём!`,
-      Markup.inlineKeyboard(pet.getMainKeyboard())
-    );
-  }
-
-  if (state && state.state === 'guess_game') {
-    const num = parseInt(text);
-    if (isNaN(num) || num < 1 || num > 10) {
-      return ctx.reply('Введи число от 1 до 10:');
-    }
-    const result = pet.processGuess(num);
-    pet.tick();
-    if (result.success !== null) {
-      clearState(ctx.from.id);
-      return ctx.reply(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-    }
-    return ctx.reply(result.message);
-  }
-
-  if (state && state.state === 'math_game') {
-    const result = pet.processMath(text);
-    pet.tick();
-    clearState(ctx.from.id);
-    return ctx.reply(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  }
-
-  if (pet.name) {
-    pet.tick();
-    return ctx.reply(`${pet.getStatusText()}\n\nИспользуй кнопки ниже для ухода за питомцем:`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  }
-});
-
-bot.action('feed', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const result = pet.feed();
-  ctx.editMessageText(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('snack', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const result = pet.snack();
-  ctx.editMessageText(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('play_menu', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  ctx.editMessageText(`Выбери игру:\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getGamesKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('game_guess', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const msg = pet.startGuessGame();
-  setState(ctx.from.id, 'guess_game');
-  ctx.editMessageText(`${msg}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('game_reaction', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const msg = pet.startReactionGame();
-  setState(ctx.from.id, 'reaction_game', { startTime: Date.now(), target: pet.gameState.targetTime });
-  ctx.editMessageText(`${msg}\n\nНажми "Стоп!", когда пройдёт время!`, Markup.inlineKeyboard([
-    [{ text: '⏹ Стоп!', callback_data: 'reaction_stop' }],
-    [{ text: '⬅ Назад', callback_data: 'play_menu' }]
-  ]));
-  ctx.answerCbQuery();
-});
-
-bot.action('reaction_stop', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  const result = pet.processReaction();
-  pet.tick();
-  clearState(ctx.from.id);
-  ctx.editMessageText(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('game_math', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const msg = pet.startMathGame();
-  setState(ctx.from.id, 'math_game');
-  ctx.editMessageText(`${msg}\n\nВведи ответ числом:`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('sleep', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const result = pet.sleep();
-  ctx.editMessageText(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('wake', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const result = pet.wakeUp();
-  ctx.editMessageText(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('clean', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const result = pet.clean();
-  ctx.editMessageText(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('praise', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const result = pet.praise();
-  ctx.editMessageText(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('scold', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const result = pet.scold();
-  ctx.editMessageText(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('medicine', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const result = pet.medicine();
-  ctx.editMessageText(`${result.message}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('status', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  ctx.editMessageText(`${pet.getStatusText()}\n\nВыбери действие:`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('main', async (ctx) => {
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  ctx.editMessageText(`${pet.getStatusText()}\n\nЧто хочешь сделать?`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
-bot.action('new_pet', async (ctx) => {
-  pets.delete(ctx.from.id);
-  const pet = getPet(ctx.from.id);
-  const buttons = Object.entries(PET_TYPES).map(([key, info]) => [
-    Markup.button.callback(`${info.emoji} ${info.name}`, `choose_pet_${key}`)
-  ]);
-  ctx.editMessageText('Выбери нового питомца:', Markup.inlineKeyboard(buttons));
-  ctx.answerCbQuery();
-});
-
-bot.action(/event_(.+)/, async (ctx) => {
-  const choice = ctx.match[1];
-  const pet = getPet(ctx.from.id);
-  pet.tick();
-  const result = pet.processEvent(choice);
-  ctx.editMessageText(`${result}\n\n${pet.getStatusText()}`, Markup.inlineKeyboard(pet.getMainKeyboard()));
-  ctx.answerCbQuery();
-});
-
+// Тикаем всех питомцев каждую минуту (один источник истины)
 setInterval(() => {
   for (const pet of pets.values()) {
     pet.tick();
   }
-}, 30000);
+  savePets();
+}, 60000);
 
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Bot is running');
+app.get('/api/pet/:userId', (req, res) => {
+  const pet = getPet(req.params.userId);
+  res.json({
+    name: pet.name,
+    petType: pet.petType,
+    emoji: pet.getEmoji(),
+    stage: pet.stage,
+    stageLabel: pet.getStageLabel(),
+    ageDays: pet.ageDays,
+    weight: pet.weight,
+    hunger: pet.hunger,
+    happiness: pet.happiness,
+    energy: pet.energy,
+    cleanliness: pet.cleanliness,
+    discipline: pet.discipline,
+    health: pet.health,
+    isSick: pet.isSick,
+    poopCount: pet.poopCount,
+    isSleeping: pet.isSleeping,
+    isDead: pet.isDead,
+    deathReason: pet.deathReason,
+    attentionNeeded: pet.attentionNeeded,
+    attentionType: pet.attentionType,
+    unlockedGames: pet.unlockedGames,
+    gameState: pet.gameState
+  });
 });
 
-server.listen(process.env.PORT || 3000, () => {
-  console.log(`HTTP server listening on port ${process.env.PORT || 3000}`);
+app.post('/api/action/:userId', (req, res) => {
+  const pet = getPet(req.params.userId);
+  const { action, data } = req.body;
+  let result;
+
+  switch (action) {
+    case 'feed':
+      result = pet.feed();
+      break;
+    case 'snack':
+      result = pet.snack();
+      break;
+    case 'play':
+      result = pet.play();
+      break;
+    case 'sleep':
+      result = pet.sleep();
+      break;
+    case 'wake':
+      result = pet.wakeUp();
+      break;
+    case 'clean':
+      result = pet.clean();
+      break;
+    case 'praise':
+      result = pet.praise();
+      break;
+    case 'scold':
+      result = pet.scold();
+      break;
+    case 'medicine':
+      result = pet.medicine();
+      break;
+    case 'game_guess_start':
+      result = { success: true, message: pet.startGuessGame() };
+      break;
+    case 'game_guess':
+      result = pet.processGuess(data && data.number);
+      break;
+    case 'game_math_start':
+      result = { success: true, message: pet.startMathGame() };
+      break;
+    case 'game_math':
+      result = pet.processMath(data && data.answer);
+      break;
+    case 'event_pet':
+      result = { success: true, message: pet.processEvent('pet') };
+      break;
+    case 'event_feed':
+      result = { success: true, message: pet.processEvent('feed') };
+      break;
+    case 'event_play':
+      result = { success: true, message: pet.processEvent('play') };
+      break;
+    case 'event_ignore':
+      result = { success: true, message: pet.processEvent('ignore') };
+      break;
+    default:
+      return res.status(400).json({ error: 'Unknown action' });
+  }
+
+  if (!result) {
+    return res.status(400).json({ error: 'Action failed' });
+  }
+
+  res.json({ result, pet: getPetSnapshot(pet) });
+  savePets();
+});
+
+function getPetSnapshot(pet) {
+  return {
+    name: pet.name,
+    petType: pet.petType,
+    emoji: pet.getEmoji(),
+    stage: pet.stage,
+    stageLabel: pet.getStageLabel(),
+    ageDays: pet.ageDays,
+    weight: pet.weight,
+    hunger: pet.hunger,
+    happiness: pet.happiness,
+    energy: pet.energy,
+    cleanliness: pet.cleanliness,
+    discipline: pet.discipline,
+    health: pet.health,
+    isSick: pet.isSick,
+    poopCount: pet.poopCount,
+    isSleeping: pet.isSleeping,
+    isDead: pet.isDead,
+    deathReason: pet.deathReason,
+    attentionNeeded: pet.attentionNeeded,
+    attentionType: pet.attentionType
+  };
+}
+
+app.get('/api/types', (req, res) => {
+  res.json(PET_TYPES);
+});
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Telegram bot commands
+bot.start((ctx) => {
+  const pet = getPet(ctx.from.id);
+  if (pet.name) {
+    return ctx.reply(`${pet.getStatusText()}\n\nОткрой мини-апп для игры с питомцем!`);
+  }
+  const buttons = Object.entries(PET_TYPES).map(([key, info]) => [
+    { text: `${info.emoji} ${info.name}`, callback_data: `choose_pet_${key}` }
+  ]);
+  ctx.reply('Добро пожаловать в Тамагочи Mini App! 🐾\n\nВыбери питомца:', {
+    reply_markup: { inline_keyboard: buttons }
+  });
+});
+
+bot.action(/choose_pet_(.+)/, (ctx) => {
+  const type = ctx.match[1];
+  const pet = getPet(ctx.from.id);
+  pet.petType = type;
+  pet.typeInfo = PET_TYPES[type] || PET_TYPES.DOG;
+  ctx.editMessageText(`Теперь придумай имя для своего ${pet.typeInfo.emoji} ${pet.typeInfo.name}:`);
+  ctx.answerCbQuery();
+});
+
+bot.on('message', (ctx) => {
+  const pet = getPet(ctx.from.id);
+  if (!pet.name && ctx.message.text && !ctx.message.text.startsWith('/')) {
+    pet.name = ctx.message.text.trim();
+    return ctx.reply(
+      `Питомец ${pet.getEmoji()} ${pet.name} создан!\n\nОткрой мини-апп, чтобы играть с ним!`,
+      {
+        reply_markup: {
+          inline_keyboard: [[{ text: '🎮 Играть с питомцем', web_app: { url: `${WEB_APP_URL}?user=${ctx.from.id}` } }]]
+        }
+      }
+    );
+  }
+  if (pet.name) {
+    return ctx.reply(`${pet.getStatusText()}\n\nОткрой мини-апп для игры!`);
+  }
 });
 
 bot.launch().then(() => {
+  loadPets();
   console.log('Бот запущен!');
 });
 
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+app.listen(PORT, () => {
+  console.log(`Сервер запущен на порту ${PORT}`);
+});
+
+process.once('SIGINT', () => {
+  savePets();
+  bot.stop('SIGINT');
+});
+process.once('SIGTERM', () => {
+  savePets();
+  bot.stop('SIGTERM');
+});
