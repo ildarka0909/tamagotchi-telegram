@@ -81,6 +81,7 @@ class Tamagotchi {
       [GROWTH_STAGES.SENIOR]: 'Пожилой'
     };
     return labels[this.stage] || this.stage;
+  }
 
   tick() {
     if (this.isDead) return;
