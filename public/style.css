@@ -5,7 +5,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Courier New', Courier, monospace;
   background: linear-gradient(135deg, #87CEEB 0%, #E0F7FA 100%);
   min-height: 100vh;
   padding: 10px;
@@ -23,13 +23,19 @@ body {
 }
 
 #petName {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: bold;
   color: #333;
+  cursor: pointer;
+  user-select: none;
+}
+
+#petName.clickable:hover {
+  color: #ff6b6b;
 }
 
 #petStage {
-  font-size: 14px;
+  font-size: 13px;
   color: #666;
   margin-top: 4px;
 }
@@ -38,90 +44,97 @@ body {
   width: 100%;
   height: 300px;
   background: linear-gradient(to bottom, #a8e6cf 0%, #dcedc1 100%);
-  border-radius: 12px;
-  border: 2px solid #fff;
+  border-radius: 8px;
+  border: 3px solid #fff;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   display: block;
   margin: 0 auto;
+  image-rendering: pixelated;
 }
 
 .stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 12px 0;
+  gap: 6px;
+  margin: 10px 0;
 }
 
 .stat {
   background: rgba(255,255,255,0.9);
-  border-radius: 8px;
-  padding: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  border-radius: 6px;
+  padding: 6px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  border: 1px solid #ddd;
 }
 
 .stat-label {
-  font-size: 11px;
+  font-size: 10px;
   color: #666;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .stat-bar {
-  height: 6px;
+  height: 5px;
   background: #e0e0e0;
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
+  border: 1px solid #ccc;
 }
 
 .stat-fill {
   height: 100%;
   background: linear-gradient(90deg, #4caf50, #8bc34a);
-  border-radius: 3px;
-  transition: width 0.3s, background 0.3s;
+  border-radius: 2px;
+  transition: width 0.2s, background 0.2s;
 }
 
 .stat-fill.critical { background: #f44336; }
 .stat-fill.warning { background: #ff9800; }
 
 .stat-value {
-  font-size: 10px;
+  font-size: 9px;
   color: #333;
+  font-family: 'Courier New', monospace;
 }
 
 .messages {
-  min-height: 40px;
-  padding: 8px;
+  min-height: 35px;
+  padding: 6px;
   background: rgba(255,255,255,0.9);
-  border-radius: 8px;
-  margin-bottom: 12px;
-  font-size: 13px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
   color: #333;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
   display: none;
+  border: 1px solid #ddd;
 }
 
 .actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .action-btn {
-  padding: 10px;
-  border: none;
-  border-radius: 8px;
+  padding: 8px;
+  border: 2px solid #333;
+  border-radius: 4px;
   background: rgba(255,255,255,0.95);
   color: #333;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  transition: transform 0.1s, background 0.2s;
+  box-shadow: 0 2px 0 #999;
+  transition: transform 0.1s;
 }
 
 .action-btn:active {
-  transform: scale(0.95);
+  transform: translateY(2px);
+  box-shadow: 0 0 0 #999;
 }
 
 .action-btn:disabled {
@@ -131,27 +144,117 @@ body {
 
 .games {
   background: rgba(255,255,255,0.9);
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  border: 1px solid #ddd;
 }
 
 .games h3 {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: #333;
+  font-size: 13px;
 }
 
 .game-btn {
   width: 100%;
-  padding: 10px;
-  margin-bottom: 6px;
-  border: none;
-  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 4px;
+  border: 2px solid #333;
+  border-radius: 4px;
   background: #fff3e0;
   color: #e65100;
-  font-weight: 600;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
   cursor: pointer;
+}
+
+/* Панель разработчика */
+.dev-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.dev-panel .dev-content {
+  background: #1a1a1a;
+  border: 2px solid #00ff00;
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 320px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.dev-panel h3 {
+  color: #00ff00;
+  margin-bottom: 15px;
+  font-size: 18px;
+  border-bottom: 1px solid #00ff00;
+  padding-bottom: 5px;
+}
+
+.dev-panel h4 {
+  color: #00ff00;
+  margin: 15px 0 8px;
+  font-size: 14px;
+}
+
+.dev-btn {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 6px;
+  border: 1px solid #00ff00;
+  border-radius: 4px;
+  background: transparent;
+  color: #00ff00;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dev-btn:hover {
+  background: #00ff00;
+  color: #000;
+}
+
+.dev-btn.danger {
+  border-color: #ff0000;
+  color: #ff0000;
+}
+
+.dev-btn.danger:hover {
+  background: #ff0000;
+  color: #fff;
+}
+
+.dev-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.dev-header button {
+  background: transparent;
+  border: 1px solid #00ff00;
+  color: #00ff00;
+  padding: 4px 8px;
+  font-family: 'Courier New', monospace;
+  cursor: pointer;
+}
+
+.dev-header button:hover {
+  background: #00ff00;
+  color: #000;
 }
 
 .overlay {
@@ -166,10 +269,11 @@ body {
 
 .overlay-content {
   background: #fff;
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 20px;
   min-width: 280px;
   text-align: center;
+  border: 2px solid #333;
 }
 
 .overlay-content h2 {
@@ -193,15 +297,11 @@ body {
 #overlayButtons button {
   padding: 8px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #4caf50;
   color: #fff;
   font-weight: 600;
   cursor: pointer;
-}
-
-#overlayButtons button.secondary {
-  background: #757575;
 }
 
 #inputPanel {
@@ -210,32 +310,61 @@ body {
   left: 50%;
   transform: translateX(-50%);
   background: #fff;
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 8px;
+  padding: 14px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
   z-index: 200;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   width: 260px;
+  border: 2px solid #333;
 }
 
 #inputPanel input {
-  padding: 10px;
+  padding: 8px;
   border: 1px solid #ddd;
-  border-radius: 8px;
+  border-radius: 4px;
   font-size: 16px;
   text-align: center;
+  font-family: 'Courier New', monospace;
 }
 
 #inputPanel button {
-  padding: 10px;
+  padding: 8px;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #4caf50;
   color: #fff;
   font-weight: 600;
   cursor: pointer;
+}
+
+#devCodePanel {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 260px;
+  border: 2px solid #333;
+}
+
+#devCodePanel input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
 }
 
 @media (max-width: 480px) {

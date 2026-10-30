@@ -1,3 +1,5 @@
+const DEV_CODE = 'TAMAGOTCHI_DEV';
+
 const t = (key) => {
   const map = {
     sleep: '💤 Спать',
@@ -9,9 +11,14 @@ const t = (key) => {
 let currentUserId = null;
 let petData = null;
 let currentGameType = null;
+let clickCount = 0;
+let clickTimer = null;
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const PIXEL_SIZE = 6;
 
 let petX = 195;
 let petY = 150;
@@ -32,9 +39,73 @@ function init() {
   const initData = tg.initDataUnsafe;
   currentUserId = initData?.user?.id || Date.now();
 
+  // Секрет: клик по имени питомца
+  const petName = document.getElementById('petName');
+  petName.addEventListener('click', handlePetNameClick);
+
   fetchPet();
   setInterval(fetchPet, 10000);
   gameLoop();
+}
+
+function handlePetNameClick() {
+  clickCount++;
+  if (clickTimer) clearTimeout(clickTimer);
+  clickTimer = setTimeout(() => { clickCount = 0; }, 1500);
+
+  if (clickCount >= 5) {
+    clickCount = 0;
+    if (clickTimer) clearTimeout(clickTimer);
+    openDevCodePanel();
+  }
+}
+
+function openDevCodePanel() {
+  document.getElementById('devCodePanel').style.display = 'flex';
+  document.getElementById('devCodeInput').value = '';
+  document.getElementById('devCodeInput').focus();
+}
+
+function closeDevCodePanel() {
+  document.getElementById('devCodePanel').style.display = 'none';
+}
+
+function submitDevCode() {
+  const input = document.getElementById('devCodeInput');
+  if (input.value.trim() === DEV_CODE) {
+    closeDevCodePanel();
+    openDevPanel();
+  } else {
+    alert('Неверный код!');
+    input.value = '';
+    input.focus();
+  }
+}
+
+function openDevPanel() {
+  document.getElementById('devPanel').style.display = 'flex';
+}
+
+function closeDevPanel() {
+  document.getElementById('devPanel').style.display = 'none';
+}
+
+async function devAction(action) {
+  try {
+    const res = await fetch(`/api/dev/${currentUserId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    });
+    const data = await res.json();
+    petData = data.pet;
+    showMessage(data.result?.message || 'Готово (dev)');
+    renderUI();
+    closeDevPanel();
+  } catch (e) {
+    console.error(e);
+    alert('Ошибка разработчика: ' + e.message);
+  }
 }
 
 async function fetchPet() {
@@ -52,6 +123,9 @@ function renderUI() {
   if (!petData) return;
 
   document.getElementById('petName').textContent = `${petData.emoji} ${petData.name || 'Питомец'}`;
+  const petNameEl = document.getElementById('petName');
+  petNameEl.onclick = null;
+  petNameEl.addEventListener('click', handlePetNameClick);
   document.getElementById('petStage').textContent = `${petData.stageLabel} | Возраст: ${petData.ageDays} дн. | Вес: ${petData.weight.toFixed(1)} кг`;
 
   const bars = [
@@ -83,6 +157,7 @@ function renderUI() {
     else if (petData.attentionType === 'sad') msg = '😢 Грустит!';
     else if (petData.attentionType === 'poop') msg = '💩 Нужно убрать!';
     else if (petData.attentionType === 'sick') msg = '🤒 Болеет!';
+    else if (petData.attentionType === 'hatched') msg = '🥚 Вылупился!';
     msgDiv.textContent = msg;
   } else {
     msgDiv.style.display = 'none';
@@ -179,14 +254,9 @@ function submitGameInput() {
     body: JSON.stringify({ action, data })
   }).then(r => r.json()).then(d => {
     petData = d.pet;
-    if (d.result.success === null) {
-      // Подсказка в угадайке, продолжаем игру
-      showMessage(d.result.message);
-    } else {
-      showMessage(d.result.message);
-      renderUI();
-      closeInput();
-    }
+    showMessage(d.result.message);
+    renderUI();
+    closeInput();
   }).catch(e => {
     console.error(e);
     closeInput();
@@ -229,31 +299,28 @@ function updatePetAnimation() {
 function gameLoop() {
   const now = Date.now();
 
-  // Физика питомца
   if (petState === 'idle' || petState === 'happy' || petState === 'sad' || petState === 'attention') {
     petStateTimer += 16;
     if (petStateTimer > 2000) {
-      petVX = (Math.random() - 0.5) * 2;
-      petVY = (Math.random() - 0.5) * 2;
+      petVX = (Math.random() - 0.5) * 1.5;
+      petVY = (Math.random() - 0.5) * 1.5;
       petStateTimer = 0;
     }
     petX += petVX;
     petY += petVY;
 
-    // Границы
-    if (petX < 50 || petX > canvas.width - 50) petVX *= -1;
-    if (petY < 50 || petY > canvas.height - 50) petVY *= -1;
+    if (petX < 40 || petX > canvas.width - 40) petVX *= -1;
+    if (petY < 40 || petY > canvas.height - 80) petVY *= -1;
 
     petAngle = Math.atan2(petVY, petVX);
-    petScale = 1 + Math.sin(now / 200) * 0.05;
+    petScale = 1 + Math.sin(now / 200) * 0.04;
   } else if (petState === 'sleep') {
     petVX = 0;
     petVY = 0;
-    petScale = 0.9;
-    petY = canvas.height - 120;
+    petScale = 0.85;
+    petY = canvas.height - 110;
   }
 
-  // Анимация моргания
   blinkTimer += 16;
   if (blinkTimer > 3000 + Math.random() * 2000) {
     blinkState = 1;
@@ -261,7 +328,6 @@ function gameLoop() {
     blinkTimer = 0;
   }
 
-  // Анимация кадров
   petFrame = (petFrame + 1) % 60;
 
   draw();
@@ -271,7 +337,7 @@ function gameLoop() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Фон травы
+  // Фон травы (пиксельный)
   ctx.fillStyle = '#8bc34a';
   ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
 
@@ -298,8 +364,10 @@ function draw() {
     drawDeadPet();
   } else if (petData && petData.isSleeping) {
     drawSleepingPet();
+  } else if (petData && petData.stage === 'egg') {
+    drawEgg();
   } else {
-    drawAlivePet();
+    drawPixelPet();
   }
 
   ctx.restore();
@@ -308,28 +376,53 @@ function draw() {
   if (petData && petData.poopCount > 0) {
     ctx.fillStyle = '#8d6e63';
     for (let i = 0; i < petData.poopCount; i++) {
-      ctx.beginPath();
-      ctx.arc(80 + i * 30, canvas.height - 40, 12, 0, Math.PI * 2);
-      ctx.fill();
+      drawPixel(80 + i * 30, canvas.height - 45, '#8d6e63', 2);
     }
   }
 
   // Индикатор внимания
   if (petData && petData.attentionNeeded && petState !== 'sleep') {
     ctx.fillStyle = '#ffeb3b';
-    ctx.beginPath();
-    ctx.arc(petX + 25, petY - 40, 8, 0, Math.PI * 2);
-    ctx.fill();
+    drawPixel(petX + 15, petY - 35, '#ffeb3b', 2);
     if (Math.floor(Date.now() / 500) % 2 === 0) {
       ctx.fillStyle = '#ff9800';
-      ctx.beginPath();
-      ctx.arc(petX + 25, petY - 40, 6, 0, Math.PI * 2);
-      ctx.fill();
+      drawPixel(petX + 15, petY - 35, '#ff9800', 1);
     }
   }
 }
 
-function drawAlivePet() {
+function drawPixel(x, y, color, size = PIXEL_SIZE) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, size, size);
+}
+
+function drawEgg() {
+  // Пиксельное яйцо
+  drawPixel(0, -10, '#fff', PIXEL_SIZE);
+  drawPixel(-PIXEL_SIZE, -5, '#fff', PIXEL_SIZE);
+  drawPixel(PIXEL_SIZE, -5, '#fff', PIXEL_SIZE);
+  drawPixel(-PIXEL_SIZE, 0, '#fff', PIXEL_SIZE);
+  drawPixel(0, 0, '#fff', PIXEL_SIZE);
+  drawPixel(PIXEL_SIZE, 0, '#fff', PIXEL_SIZE);
+  drawPixel(-PIXEL_SIZE, 5, '#fff', PIXEL_SIZE);
+  drawPixel(0, 5, '#fff', PIXEL_SIZE);
+  drawPixel(PIXEL_SIZE, 5, '#fff', PIXEL_SIZE);
+  drawPixel(0, 10, '#fff', PIXEL_SIZE);
+
+  // Треснувшая скорлупа (случайно)
+  if (petFrame % 40 < 20) {
+    drawPixel(-PIXEL_SIZE, -10, '#e0e0e0', PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, 10, '#e0e0e0', PIXEL_SIZE);
+  }
+
+  // Тень
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(0, 20, 16, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPixelPet() {
   const type = petData.petType || 'DOG';
   const isDog = type === 'DOG';
   const isCat = type === 'CAT';
@@ -337,161 +430,198 @@ function drawAlivePet() {
   const isRobot = type === 'ROBOT';
 
   const blink = blinkState === 1;
+  const color = isDog ? '#F4A261' : isCat ? '#C0C0C0' : isDragon ? '#4CAF50' : '#90A4AE';
+  const darkColor = isDog ? '#E76F51' : isCat ? '#A0A0A0' : isDragon ? '#2E7D32' : '#607D8B';
+  const eyeColor = '#2D4059';
 
   // Тень
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
   ctx.beginPath();
-  ctx.ellipse(0, 35, 20, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 25, 18, 6, 0, 0, Math.PI * 2);
   ctx.fill();
 
   if (isDog) {
-    // Тело
-    ctx.fillStyle = '#F4A261';
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 22, 14, 0, 0, Math.PI * 2);
-    ctx.fill();
+    drawPixel(-PIXEL_SIZE, -15, color, PIXEL_SIZE); // левое ухо
+    drawPixel(PIXEL_SIZE, -18, color, PIXEL_SIZE); // правое ухо
+    drawPixel(-PIXEL_SIZE*2, -12, darkColor, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE*2, -15, darkColor, PIXEL_SIZE);
 
-    // Голова
-    ctx.fillStyle = '#F4A261';
-    ctx.beginPath();
-    ctx.arc(-15, -12, 14, 0, Math.PI * 2);
-    ctx.fill();
+    drawPixel(-PIXEL_SIZE, -8, color, PIXEL_SIZE); // голова лево
+    drawPixel(0, -8, color, PIXEL_SIZE); // голова центр
+    drawPixel(PIXEL_SIZE, -8, color, PIXEL_SIZE); // голова право
 
-    // Уши
-    ctx.fillStyle = '#E76F51';
-    ctx.beginPath();
-    ctx.ellipse(-22, -18, 6, 10, -0.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(-8, -20, 6, 10, 0.5, 0, Math.PI * 2);
-    ctx.fill();
+    drawPixel(-PIXEL_SIZE*2, -3, color, PIXEL_SIZE); // тело лево
+    drawPixel(-PIXEL_SIZE, -3, color, PIXEL_SIZE); // тело центр-лево
+    drawPixel(0, -3, color, PIXEL_SIZE); // тело центр
+    drawPixel(PIXEL_SIZE, -3, color, PIXEL_SIZE); // тело центр-право
+    drawPixel(PIXEL_SIZE*2, -3, color, PIXEL_SIZE); // тело право
 
     // Глаза
-    ctx.fillStyle = '#2D4059';
+    ctx.fillStyle = eyeColor;
     if (blink) {
-      ctx.fillRect(-19, -14, 4, 2);
-      ctx.fillRect(-11, -14, 4, 2);
+      drawPixel(-PIXEL_SIZE, -7, '#000', 2);
+      drawPixel(PIXEL_SIZE, -7, '#000', 2);
     } else {
-      ctx.beginPath(); ctx.arc(-19, -14, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(-11, -14, 3, 0, Math.PI * 2); ctx.fill();
+      drawPixel(-PIXEL_SIZE, -7, eyeColor, 2);
+      drawPixel(PIXEL_SIZE, -7, eyeColor, 2);
     }
 
     // Нос
-    ctx.fillStyle = '#2D4059';
-    ctx.beginPath(); ctx.arc(-22, -10, 3, 0, Math.PI * 2); ctx.fill();
+    drawPixel(-PIXEL_SIZE*2, -5, eyeColor, 2);
 
     // Лапы
-    ctx.fillStyle = '#F4A261';
-    ctx.beginPath(); ctx.arc(-8, 10, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(4, 10, 5, 0, Math.PI * 2); ctx.fill();
+    drawPixel(-PIXEL_SIZE, 5, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, 5, color, PIXEL_SIZE);
 
     // Хвост
-    ctx.strokeStyle = '#E76F51';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(12, 0);
-    ctx.quadraticCurveTo(20, -5, 18, -12);
-    ctx.stroke();
-  } else if (isCat) {
-    ctx.fillStyle = '#C0C0C0';
-    ctx.beginPath(); ctx.ellipse(0, 0, 20, 12, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#C0C0C0';
-    ctx.beginPath(); ctx.arc(-14, -10, 12, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FFD700';
-    if (blink) {
-      ctx.fillRect(-17, -12, 3, 2);
-      ctx.fillRect(-11, -12, 3, 2);
-    } else {
-      ctx.beginPath(); ctx.arc(-17, -12, 2, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(-11, -12, 2, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.fillStyle = '#FF6B6B';
-    ctx.beginPath(); ctx.arc(-19, -8, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#C0C0C0';
-    ctx.beginPath(); ctx.arc(-6, 8, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(2, 8, 4, 0, Math.PI * 2); ctx.fill();
-  } else if (isDragon) {
-    ctx.fillStyle = '#4CAF50';
-    ctx.beginPath(); ctx.ellipse(0, 0, 24, 14, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#4CAF50';
-    ctx.beginPath(); ctx.arc(-16, -12, 13, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FF5722';
-    if (blink) {
-      ctx.fillRect(-19, -14, 3, 2);
-      ctx.fillRect(-11, -14, 3, 2);
-    } else {
-      ctx.beginPath(); ctx.arc(-19, -14, 2.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(-11, -14, 2.5, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.fillStyle = '#FF5722';
-    ctx.beginPath(); ctx.arc(-22, -10, 2.5, 0, Math.PI * 2); ctx.fill();
-    // Крылья
-    ctx.fillStyle = '#2E7D32';
-    ctx.beginPath();
-    ctx.moveTo(10, -2);
-    ctx.lineTo(22, -10);
-    ctx.lineTo(16, 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(-6, 9, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.arc(2, 9, 4, 0, Math.PI * 2); ctx.fill();
-  } else if (isRobot) {
-    ctx.fillStyle = '#90A4AE';
-    ctx.beginPath(); ctx.rect(-16, -8, 32, 18); ctx.fill();
-    ctx.fillStyle = '#607D8B';
-    ctx.beginPath(); ctx.rect(-18, -10, 36, 22); ctx.fill();
-    ctx.fillStyle = '#FFEB3B';
-    if (blink) {
-      ctx.fillRect(-13, -4, 5, 4);
-      ctx.fillRect(8, -4, 5, 4);
-    } else {
-      ctx.beginPath(); ctx.arc(-11, -2, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(10, -2, 3, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.fillStyle = '#455A64';
-    ctx.beginPath(); ctx.arc(-14, -2, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#90A4AE';
-    ctx.beginPath(); ctx.arc(-6, 10, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(2, 10, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#FF5722';
-    ctx.beginPath(); ctx.arc(-2, 2, 3, 0, Math.PI * 2); ctx.fill();
-  }
-
-  // Анимация движения лап при ходьбе
-  if (petState !== 'idle' && petState !== 'sleep' && petData && !petData.isSleeping) {
-    const legOffset = Math.sin(Date.now() / 150) * 3;
-    ctx.strokeStyle = '#E76F51';
+    ctx.strokeStyle = darkColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(-6, 8);
-    ctx.lineTo(-6 - legOffset, 14);
+    ctx.moveTo(PIXEL_SIZE*2, -3);
+    ctx.lineTo(PIXEL_SIZE*3, -8);
+    ctx.stroke();
+  } else if (isCat) {
+    drawPixel(-PIXEL_SIZE, -12, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, -12, color, PIXEL_SIZE);
+    drawPixel(-PIXEL_SIZE*2, -8, darkColor, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE*2, -8, darkColor, PIXEL_SIZE);
+
+    drawPixel(-PIXEL_SIZE, -4, color, PIXEL_SIZE);
+    drawPixel(0, -4, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, -4, color, PIXEL_SIZE);
+
+    drawPixel(-PIXEL_SIZE*2, 1, color, PIXEL_SIZE);
+    drawPixel(-PIXEL_SIZE, 1, color, PIXEL_SIZE);
+    drawPixel(0, 1, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, 1, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE*2, 1, color, PIXEL_SIZE);
+
+    ctx.fillStyle = '#FFD700';
+    if (blink) {
+      drawPixel(-PIXEL_SIZE, -5, '#000', 2);
+      drawPixel(PIXEL_SIZE, -5, '#000', 2);
+    } else {
+      drawPixel(-PIXEL_SIZE, -5, '#FFD700', 2);
+      drawPixel(PIXEL_SIZE, -5, '#FFD700', 2);
+    }
+
+    drawPixel(-PIXEL_SIZE*2, -3, '#FF6B6B', 2);
+
+    drawPixel(-PIXEL_SIZE, 6, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, 6, color, PIXEL_SIZE);
+  } else if (isDragon) {
+    drawPixel(-PIXEL_SIZE, -14, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, -14, color, PIXEL_SIZE);
+
+    drawPixel(-PIXEL_SIZE*2, -9, color, PIXEL_SIZE);
+    drawPixel(-PIXEL_SIZE, -9, color, PIXEL_SIZE);
+    drawPixel(0, -9, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, -9, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE*2, -9, color, PIXEL_SIZE);
+
+    drawPixel(-PIXEL_SIZE*2, -3, color, PIXEL_SIZE);
+    drawPixel(-PIXEL_SIZE, -3, color, PIXEL_SIZE);
+    drawPixel(0, -3, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, -3, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE*2, -3, color, PIXEL_SIZE);
+
+    ctx.fillStyle = '#FF5722';
+    if (blink) {
+      drawPixel(-PIXEL_SIZE, -8, '#000', 2);
+      drawPixel(PIXEL_SIZE, -8, '#000', 2);
+    } else {
+      drawPixel(-PIXEL_SIZE, -8, '#FF5722', 2);
+      drawPixel(PIXEL_SIZE, -8, '#FF5722', 2);
+    }
+
+    drawPixel(-PIXEL_SIZE*2, -6, '#FF5722', 2);
+
+    // Крылья
+    ctx.fillStyle = '#2E7D32';
+    drawPixel(PIXEL_SIZE*2, -5, '#2E7D32', PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE*3, -8, '#2E7D32', PIXEL_SIZE);
+
+    drawPixel(-PIXEL_SIZE, 6, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, 6, color, PIXEL_SIZE);
+  } else if (isRobot) {
+    drawPixel(-PIXEL_SIZE*2, -10, color, PIXEL_SIZE);
+    drawPixel(-PIXEL_SIZE, -10, color, PIXEL_SIZE);
+    drawPixel(0, -10, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, -10, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE*2, -10, color, PIXEL_SIZE);
+
+    drawPixel(-PIXEL_SIZE*2, -4, color, PIXEL_SIZE);
+    drawPixel(-PIXEL_SIZE, -4, color, PIXEL_SIZE);
+    drawPixel(0, -4, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, -4, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE*2, -4, color, PIXEL_SIZE);
+
+    ctx.fillStyle = '#FFEB3B';
+    if (blink) {
+      drawPixel(-PIXEL_SIZE, -6, '#000', 2);
+      drawPixel(PIXEL_SIZE, -6, '#000', 2);
+    } else {
+      drawPixel(-PIXEL_SIZE, -6, '#FFEB3B', 2);
+      drawPixel(PIXEL_SIZE, -6, '#FFEB3B', 2);
+    }
+
+    drawPixel(-PIXEL_SIZE*2, -5, '#455A64', 2);
+
+    drawPixel(-PIXEL_SIZE, 6, color, PIXEL_SIZE);
+    drawPixel(PIXEL_SIZE, 6, color, PIXEL_SIZE);
+
+    // Кнопка на груди
+    ctx.fillStyle = '#FF5722';
+    drawPixel(0, 0, '#FF5722', PIXEL_SIZE);
+  }
+
+  // Анимация лап при движении
+  if (petState !== 'idle' && petState !== 'sleep' && petData && !petData.isSleeping) {
+    const legOffset = Math.sin(Date.now() / 150) * 2;
+    ctx.strokeStyle = darkColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-PIXEL_SIZE, 5);
+    ctx.lineTo(-PIXEL_SIZE - legOffset, 8);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(4, 8);
-    ctx.lineTo(4 + legOffset, 14);
+    ctx.moveTo(PIXEL_SIZE, 5);
+    ctx.lineTo(PIXEL_SIZE + legOffset, 8);
     ctx.stroke();
   }
 }
 
 function drawSleepingPet() {
-  ctx.fillStyle = '#90A4AE';
-  ctx.beginPath(); ctx.ellipse(0, 0, 20, 12, 0, 0, Math.PI * 2); ctx.fill();
+  const color = petData.petType === 'CAT' ? '#C0C0C0' : petData.petType === 'DOG' ? '#F4A261' : petData.petType === 'DRAGON' ? '#4CAF50' : '#90A4AE';
+  drawPixel(-PIXEL_SIZE, -5, color, PIXEL_SIZE);
+  drawPixel(0, -5, color, PIXEL_SIZE);
+  drawPixel(PIXEL_SIZE, -5, color, PIXEL_SIZE);
+  drawPixel(-PIXEL_SIZE, 0, color, PIXEL_SIZE);
+  drawPixel(PIXEL_SIZE, 0, color, PIXEL_SIZE);
+
   ctx.fillStyle = '#2D4059';
-  ctx.beginPath(); ctx.arc(-5, -5, 2, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(2, -5, 2, 0, Math.PI * 2); ctx.fill();
-  // Зzz
+  drawPixel(-PIXEL_SIZE, -6, '#2D4059', 2);
+  drawPixel(PIXEL_SIZE, -6, '#2D4059', 2);
+
+  // Zzz
   ctx.fillStyle = '#4CAF50';
-  ctx.font = '16px Arial';
+  ctx.font = 'bold 14px Courier New';
   ctx.fillText('Z', 12, -10);
-  ctx.fillText('z', 16, -5);
+  ctx.fillText('z', 18, -6);
 }
 
 function drawDeadPet() {
-  ctx.fillStyle = '#757575';
-  ctx.beginPath(); ctx.ellipse(0, 0, 20, 12, 0, 0, Math.PI * 2); ctx.fill();
+  const color = '#757575';
+  drawPixel(-PIXEL_SIZE, -5, color, PIXEL_SIZE);
+  drawPixel(0, -5, color, PIXEL_SIZE);
+  drawPixel(PIXEL_SIZE, -5, color, PIXEL_SIZE);
+  drawPixel(-PIXEL_SIZE, 0, color, PIXEL_SIZE);
+  drawPixel(PIXEL_SIZE, 0, color, PIXEL_SIZE);
+
   ctx.fillStyle = '#2D4059';
-  ctx.beginPath(); ctx.arc(-6, -3, 2, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(2, -3, 2, 0, Math.PI * 2); ctx.fill();
+  drawPixel(-PIXEL_SIZE, -6, '#2D4059', 2);
+  drawPixel(PIXEL_SIZE, -6, '#2D4059', 2);
+
   ctx.strokeStyle = '#2D4059';
   ctx.lineWidth = 2;
   ctx.beginPath();

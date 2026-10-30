@@ -10,7 +10,7 @@
 <body>
   <div id="app">
     <div class="header">
-      <div id="petName">Питомец</div>
+      <div id="petName" class="clickable">Питомец</div>
       <div id="petStage">Яйцо</div>
     </div>
 
@@ -69,6 +69,48 @@
       <button class="game-btn" onclick="closeGames()">Закрыть</button>
     </div>
 
+    <!-- Панель разработчика (скрыта) -->
+    <div id="devPanel" class="dev-panel" style="display:none">
+      <div class="dev-content">
+        <div class="dev-header">
+        <h3>🔧 Разработчик</h3>
+        <button onclick="closeDevPanel()">✕</button>
+      </div>
+      <div class="dev-section">
+        <h4>Статус</h4>
+        <button class="dev-btn" onclick="devAction('heal')">❤️ Исцелить полностью</button>
+        <button class="dev-btn" onclick="devAction('feed_full')">🍗 Накормить (Голод=0)</button>
+        <button class="dev-btn" onclick="devAction('happy_full')">😊 Радость=100</button>
+        <button class="dev-btn" onclick="devAction('energy_full')">🔋 Энергия=100</button>
+        <button class="dev-btn" onclick="devAction('clean_full')">🧼 Чистота=100</button>
+        <button class="dev-btn" onclick="devAction('discipline_full')">🛡 Discipline=100</button>
+      </div>
+      <div class="dev-section">
+        <h4>Возраст и этап</h4>
+        <button class="dev-btn" onclick="devAction('age_plus')">+1 день возраста</button>
+        <button class="dev-btn" onclick="devAction('stage_egg')">🥚 Яйцо</button>
+        <button class="dev-btn" onclick="devAction('stage_baby')">👶 Младенец</button>
+        <button class="dev-btn" onclick="devAction('stage_child')">🧒 Ребёнок</button>
+        <button class="dev-btn" onclick="devAction('stage_teen')">👦 Подросток</button>
+        <button class="dev-btn" onclick="devAction('stage_adult')">👨 Взрослый</button>
+        <button class="dev-btn" onclick="devAction('stage_senior')">👴 Пожилой</button>
+      </div>
+      <div class="dev-section">
+        <h4>Управление</h4>
+        <button class="dev-btn danger" onclick="devAction('kill')">☠️ Убить питомца</button>
+        <button class="dev-btn danger" onclick="devAction('revive')">⚡ Воскресить</button>
+        <button class="dev-btn" onclick="devAction('unlock_games')">🎮 Все игры</button>
+        <button class="dev-btn" onclick="devAction('reset')">🔄 Сбросить питомца</button>
+      </div>
+      <div class="dev-section">
+        <h4>События</h4>
+        <button class="dev-btn" onclick="devAction('event_call')">📞 Звонок питомца</button>
+        <button class="dev-btn" onclick="devAction('event_poop')">💩 Насрать</button>
+        <button class="dev-btn" onclick="devAction('event_sick')">🤒 Заболеть</button>
+      </div>
+    </div>
+  </div>
+
     <div id="overlay" class="overlay" style="display:none">
       <div class="overlay-content">
         <h2 id="overlayTitle"></h2>
@@ -81,6 +123,13 @@
       <input type="number" id="gameInput" placeholder="Введите число">
       <button onclick="submitGameInput()">Отправить</button>
       <button onclick="closeInput()">Отмена</button>
+    </div>
+
+    <!-- Ввод кода разработчика -->
+    <div id="devCodePanel" style="display:none">
+      <input type="text" id="devCodeInput" placeholder="Введите код разработчика..." maxlength="20">
+      <button onclick="submitDevCode()">Ввести</button>
+      <button onclick="closeDevCodePanel()">Отмена</button>
     </div>
   </div>
 

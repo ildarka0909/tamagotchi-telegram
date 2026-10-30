@@ -163,6 +163,121 @@ app.post('/api/action/:userId', (req, res) => {
   savePets();
 });
 
+// Панель разработчика
+app.post('/api/dev/:userId', (req, res) => {
+  const pet = getPet(req.params.userId);
+  const { action } = req.body;
+  let result;
+
+  switch (action) {
+    case 'heal':
+      pet.health = 100;
+      pet.isSick = false;
+      pet.sickSince = null;
+      result = { success: true, message: '❤️ Здоровье восстановлено!' };
+      break;
+    case 'feed_full':
+      pet.hunger = 0;
+      result = { success: true, message: '🍗 Голод = 0!' };
+      break;
+    case 'happy_full':
+      pet.happiness = 100;
+      result = { success: true, message: '😊 Радость = 100!' };
+      break;
+    case 'energy_full':
+      pet.energy = 100;
+      result = { success: true, message: '🔋 Энергия = 100!' };
+      break;
+    case 'clean_full':
+      pet.cleanliness = 100;
+      pet.poopCount = 0;
+      result = { success: true, message: '🧼 Чистота = 100!' };
+      break;
+    case 'discipline_full':
+      pet.discipline = 100;
+      result = { success: true, message: '🛡 Discipline = 100!' };
+      break;
+    case 'age_plus':
+      pet.ageMinutes += 1440;
+      pet.ageDays = Math.floor(pet.ageMinutes / 1440);
+      result = { success: true, message: '+1 день возраста!' };
+      break;
+    case 'stage_egg':
+      pet.stage = GROWTH_STAGES.EGG;
+      result = { success: true, message: '🥚 Этап: Яйцо' };
+      break;
+    case 'stage_baby':
+      pet.stage = GROWTH_STAGES.BABY;
+      result = { success: true, message: '👶 Этап: Младенец' };
+      break;
+    case 'stage_child':
+      pet.stage = GROWTH_STAGES.CHILD;
+      result = { success: true, message: '🧒 Этап: Ребёнок' };
+      break;
+    case 'stage_teen':
+      pet.stage = GROWTH_STAGES.TEEN;
+      result = { success: true, message: '👦 Этап: Подросток' };
+      break;
+    case 'stage_adult':
+      pet.stage = GROWTH_STAGES.ADULT;
+      result = { success: true, message: '👨 Этап: Взрослый' };
+      break;
+    case 'stage_senior':
+      pet.stage = GROWTH_STAGES.SENIOR;
+      result = { success: true, message: '👴 Этап: Пожилой' };
+      break;
+    case 'kill':
+      pet.isDead = true;
+      pet.deathReason = 'разработчик';
+      result = { success: true, message: '☠️ Питомец убран' };
+      break;
+    case 'revive':
+      pet.isDead = false;
+      pet.deathReason = null;
+      pet.hunger = 50;
+      pet.happiness = 50;
+      pet.health = 100;
+      pet.energy = 100;
+      pet.cleanliness = 100;
+      result = { success: true, message: '⚡ Питомец воскрешён!' };
+      break;
+    case 'unlock_games':
+      pet.unlockedGames = ['guess', 'reaction', 'math'];
+      result = { success: true, message: '🎮 Все игры разблокированы!' };
+      break;
+    case 'reset':
+      pets.delete(req.params.userId);
+      const newPet = new Tamagotchi(req.params.userId);
+      pets.set(req.params.userId, newPet);
+      result = { success: true, message: '🔄 Питомец сброшен!' };
+      return res.json({ result, pet: getPetSnapshot(newPet) });
+    case 'event_call':
+      pet.attentionNeeded = true;
+      pet.attentionType = 'call';
+      result = { success: true, message: '📞 Вызван звонок!' };
+      break;
+    case 'event_poop':
+      pet.poopCount = 1;
+      pet.attentionNeeded = true;
+      pet.attentionType = 'poop';
+      result = { success: true, message: '💩 Насрано!' };
+      break;
+    case 'event_sick':
+      pet.isSick = true;
+      pet.sickSince = Date.now();
+      pet.attentionNeeded = true;
+      pet.attentionType = 'sick';
+      result = { success: true, message: '🤒 Заболевание вызвано!' };
+      break;
+    default:
+      return res.status(400).json({ error: 'Unknown dev action' });
+  }
+
+  pet.tick();
+  savePets();
+  res.json({ result, pet: getPetSnapshot(pet) });
+});
+
 function getPetSnapshot(pet) {
   return {
     name: pet.name,
@@ -237,8 +352,8 @@ bot.on('message', (ctx) => {
   }
 });
 
+loadPets();
 bot.launch().then(() => {
-  loadPets();
   console.log('Бот запущен!');
 });
 
